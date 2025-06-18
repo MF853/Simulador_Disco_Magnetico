@@ -7,7 +7,7 @@ import random
 class DiskSchedulingSimulator:
     """
     A GUI application to simulate and visualize various disk scheduling algorithms.
-    All algorithm results are plotted in a single window for comparison.
+    All algorithm results are plotted in a grid layout for better comparison.
     """
 
     def __init__(self, master):
@@ -19,7 +19,7 @@ class DiskSchedulingSimulator:
         """
         self.master = master
         self.master.title("Disk Scheduling Algorithm Simulator")
-        self.master.geometry("800x800")  # Adjusted for single plot window
+        self.master.geometry("900x900")  # Adjusted for grid plot window
         self.master.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         # --- Frames for layout ---
@@ -61,8 +61,8 @@ class DiskSchedulingSimulator:
         ttk.Button(button_frame, text="Clear Plot", command=self.clear_plot).pack(side="left", padx=5)
 
         # --- Matplotlib plot area ---
-        # Create a figure with 5 subplots, sharing the X-axis
-        self.fig, self.axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
+        # Create a figure with a 3x2 grid of subplots
+        self.fig, self.axs = plt.subplots(3, 2, figsize=(12, 10), sharex=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
         self.fig.suptitle("Disk Scheduling Algorithm Comparison", fontsize=16)
@@ -75,10 +75,12 @@ class DiskSchedulingSimulator:
 
 
     def clear_plot(self):
-        """Clears all subplots."""
-        for ax in self.axs:
+        """Clears all subplots in the grid."""
+        # Iterate over the flattened 2D array of axes
+        for ax in self.axs.flatten():
             ax.clear()
-        self.fig.suptitle("Disk Scheduling Algorithm Comparison", fontsize=16) # Reset title
+            ax.axis('on') # Ensure axis is visible for the next plot
+        self.fig.suptitle("Disk Scheduling Algorithm Comparison", fontsize=16)
         self.canvas.draw()
 
 
@@ -129,7 +131,7 @@ class DiskSchedulingSimulator:
 
 
     def run_simulation(self):
-        """Runs the simulation and plots results on the shared canvas."""
+        """Runs the simulation and plots results on the grid canvas."""
         inputs = self.get_inputs()
         if not inputs:
             return
@@ -138,20 +140,28 @@ class DiskSchedulingSimulator:
         head, requests, disk_size = inputs
 
         algorithms = {
-            "FCFS": (self.fcfs, self.axs[0]),
-            "SSTF": (self.sstf, self.axs[1]),
-            "SCAN": (self.scan, self.axs[2]),
-            "C-SCAN": (self.c_scan, self.axs[3]),
-            "C-LOOK": (self.c_look, self.axs[4])
+            "FCFS": self.fcfs,
+            "SSTF": self.sstf,
+            "SCAN": self.scan,
+            "C-SCAN": self.c_scan,
+            "C-LOOK": self.c_look
         }
 
-        for name, (func, ax) in algorithms.items():
+        # Flatten the 2D array of axes for easy iteration
+        axes_flat = self.axs.flatten()
+
+        for i, (name, func) in enumerate(algorithms.items()):
+            ax = axes_flat[i]
             seek_sequence, total_seek = func(head, list(requests), disk_size)
             self.plot_on_axis(ax, name, seek_sequence, total_seek, disk_size)
         
-        # Set common X-label for the last subplot
-        self.axs[-1].set_xlabel("Cylinder / Track Number", fontsize=12)
-        self.fig.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
+        # Hide any unused subplots
+        for i in range(len(algorithms), len(axes_flat)):
+            axes_flat[i].axis('off')
+
+        # Set common X-label for the figure
+        self.fig.text(0.5, 0.04, "Cylinder / Track Number", ha='center', va='center', fontsize=12)
+        self.fig.tight_layout(rect=[0, 0.05, 1, 0.95]) # Adjust layout
         self.canvas.draw()
 
 
@@ -160,7 +170,7 @@ class DiskSchedulingSimulator:
         Plots the disk head's movement on a specific subplot axis.
         """
         y_coords = list(range(len(sequence)))
-        ax.plot(sequence, y_coords, '-o', color='blue', markersize=6, markerfacecolor='lightblue')
+        ax.plot(sequence, y_coords, '-o', color='blue', markersize=5, markerfacecolor='lightblue')
         ax.invert_yaxis()
 
         if name in ["SCAN", "C-SCAN", "C-LOOK"]:
@@ -170,7 +180,7 @@ class DiskSchedulingSimulator:
                             arrowprops=dict(arrowstyle="->", color="r", shrinkA=4, shrinkB=4))
 
         ax.set_yticks(y_coords)
-        ax.set_yticklabels(sequence)
+        ax.set_yticklabels(sequence, fontsize=8)
         ax.set_ylabel("Request Order")
         ax.set_title(f"{name} (Total Seek: {total_seek})")
         ax.set_xlim(-5, disk_size + 5)
